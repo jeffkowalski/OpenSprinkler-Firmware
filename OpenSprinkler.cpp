@@ -1345,9 +1345,68 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
       // send GET command
       switch_httpstation((HTTPStationData *)stn->data, value);
     }
-#endif    
+#endif
   }
 }
+
+
+/** Callback function for browseUrl calls */
+void httpget_callback(byte status, uint16_t off, uint16_t len) {
+#if defined(SERIAL_DEBUG)
+    Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
+    DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
+#endif
+}
+
+
+/** Record station status
+ * Send a station's on/off status to remote influx database
+ */
+void record_status(byte station, bool status) {
+  EthernetClient client;
+  struct hostent *host;
+  static const char* server = "carbon.local";
+
+  host = gethostbyname(server);
+  if (!host) {
+    DEBUG_PRINT("can't resolve http server - ");
+    DEBUG_PRINTLN(server);
+    return;
+  }
+
+  if (!client.connect((uint8_t*)host->h_addr, 8086)) {
+    client.stop();
+    return;
+  }
+
+  static char postval[TMP_BUFFER_SIZE];
+  sprintf(postval, "station%02d value=%d", station, status?1:0);
+  char postBuffer[1500];
+  sprintf(postBuffer, "POST /write?db=ospi HTTP/1.0\r\n"
+                      "Host: %s\r\n"
+                      "Accept: */*\r\n"
+                      "Content-Length: %d\r\n"
+                      "Content-Type: application/json\r\n"
+                      "\r\n%s", host->h_name, strlen(postval), postval);
+  client.write((uint8_t *)postBuffer, strlen(postBuffer));
+
+  bzero(ether_buffer, ETHER_BUFFER_SIZE);
+
+  time_t timeout = now() + 5; // 5 seconds timeout
+  while(now() < timeout) {
+    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
+    if (len<=0) {
+      if(!client.connected())
+        break;
+      else
+        continue;
+    }
+    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
+  }
+
+  client.stop();
+}
+
 
 /** Set station bit
  * This function sets/resets the corresponding station bit variable
@@ -1355,8 +1414,11 @@ void OpenSprinkler::switch_special_station(byte sid, byte value) {
  * (which results in physical actions of opening/closing valves).
  */
 byte OpenSprinkler::set_station_bit(byte sid, byte value) {
+  record_status(sid, !!value);
+
   byte *data = station_bits+(sid>>3);  // pointer to the station byte
   byte mask = (byte)1<<(sid&0x07); // mask
+
   if (value) {
     if((*data)&mask) return 0;  // if bit is already set, return no change
     else {
@@ -1478,14 +1540,6 @@ void OpenSprinkler::switch_gpiostation(GPIOStationData *data, bool turnon) {
     digitalWrite(gpio, activeState);
   else
     digitalWrite(gpio, 1-activeState);
-}
-
-/** Callback function for browseUrl calls */
-void httpget_callback(byte status, uint16_t off, uint16_t len) {
-#if defined(SERIAL_DEBUG)
-  Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
-  DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
-#endif
 }
 
 /** Switch remote station
