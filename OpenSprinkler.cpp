@@ -1471,7 +1471,7 @@ void record_to_database(const char *postval) {
   sprintf(postBuffer, "POST /write?db=ospi HTTP/1.0\r\n"
                       "Host: %s\r\n"
                       "Accept: */*\r\n"
-                      "Content-Length: %d\r\n"
+                      "Content-Length: %ld\r\n"
                       "Content-Type: application/json\r\n"
                       "\r\n%s", host->h_name, strlen(postval), postval);
   client.write((uint8_t *)postBuffer, strlen(postBuffer));
