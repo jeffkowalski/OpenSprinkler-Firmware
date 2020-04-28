@@ -1,0 +1,8 @@
+| 3.3V       | red    | orange | +5v |
+| SDA        | brown  | yellow | +5v |
+| SCL        | black  | green  | GND |
+| CLK GPIO4  | white  |        |     |
+| GND        | grey   |        |     |
+| NOE GPIO17 | purple |        |     |
+| DAT GPIO27 | blue   |        |     |
+| LAT GPIO22 | green  |        |     |
