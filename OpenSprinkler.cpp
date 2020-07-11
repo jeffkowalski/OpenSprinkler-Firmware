@@ -27,6 +27,7 @@
 #include "testmode.h"
 
 /** Declare static data members */
+OSMqtt OpenSprinkler::mqtt;
 NVConData OpenSprinkler::nvdata;
 ConStatus OpenSprinkler::status;
 ConStatus OpenSprinkler::old_status;
@@ -175,6 +176,7 @@ const char sopt_json_names[] PROGMEM =
 	"ifkey"
 	"ssid\0"
 	"pass\0"
+	"mqtt\0"
 	"apass";
 */
 
@@ -405,6 +407,7 @@ const char *OpenSprinkler::sopts[] = {
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING,
+	DEFAULT_EMPTY_STRING,
 	DEFAULT_EMPTY_STRING
 };
 
@@ -540,6 +543,18 @@ byte OpenSprinkler::start_ether() {
 	return 1;
 }
 
+bool OpenSprinkler::network_connected(void) {
+#if defined (ESP8266)
+	if(m_server) {
+		return (Ethernet.linkStatus()==LinkON);
+	} else {
+		return (get_wifi_mode()==WIFI_MODE_STA && WiFi.status()==WL_CONNECTED && state==OS_STATE_CONNECTED);
+	}
+#else
+	return (Ethernet.linkStatus()==LinkON);
+#endif
+}
+
 /** Reboot controller */
 void OpenSprinkler::reboot_dev(uint8_t cause) {
 	lcd_print_line_clear_pgm(PSTR("Rebooting..."), 0);
@@ -560,6 +575,8 @@ void OpenSprinkler::reboot_dev(uint8_t cause) {
 #include "etherport.h"
 #include <sys/reboot.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
 #include "utils.h"
 #include "server.h"
 
@@ -573,6 +590,41 @@ byte OpenSprinkler::start_network() {
 
 	m_server = new EthernetServer(port);
 	return m_server->begin();
+}
+
+bool OpenSprinkler::network_connected(void) {
+	return true;
+}
+
+// Return mac of first recognised interface and fallback to software mac
+// Note: on OSPi, operating system handles interface allocation so 'wired' ignored
+bool OpenSprinkler::load_hardware_mac(byte* mac, bool wired) {
+	const char * if_names[]  = { "eth0", "eth1", "wlan0", "wlan1" };
+	struct ifreq ifr;
+	int fd;
+
+	// Fallback to asoftware mac if interface not recognised
+	mac[0] = 0x00;
+	mac[1] = 0x69;
+	mac[2] = 0x69;
+	mac[3] = 0x2D;
+	mac[4] = 0x31;
+	mac[5] = iopts[IOPT_DEVICE_ID];
+
+	if (m_server == NULL) return true;
+
+	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == 0) return true;
+
+	// Returns the mac address of the first interface if multiple active
+	for (int i = 0; i < sizeof(if_names)/sizeof(const char *); i++) {
+		strncpy(ifr.ifr_name, if_names[i], sizeof(ifr.ifr_name));
+		if (ioctl(fd, SIOCGIFHWADDR, &ifr) != -1) {
+			memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
+			break;
+		}
+	}
+	close(fd);
+	return true;
 }
 
 /** Reboot controller */
@@ -2069,6 +2121,17 @@ void OpenSprinkler::iopts_load() {
 	status.enabled = iopts[IOPT_DEVICE_ENABLE];
 	iopts[IOPT_FW_VERSION] = OS_FW_VERSION;
 	iopts[IOPT_FW_MINOR] = OS_FW_MINOR;
+        /* Reject the former default 50.97.210.169 NTP IP address as
+         * it no longer works, yet is carried on by people's saved
+         * configs when they upgrade from older versions.
+         * IOPT_NTP_IP1 = 0 leads to the new good default behavior. */
+        if (iopts[IOPT_NTP_IP1] == 50 && iopts[IOPT_NTP_IP2] == 97 &&
+            iopts[IOPT_NTP_IP3] == 210 && iopts[IOPT_NTP_IP4] == 169) {
+            iopts[IOPT_NTP_IP1] = 0;
+            iopts[IOPT_NTP_IP2] = 0;
+            iopts[IOPT_NTP_IP3] = 0;
+            iopts[IOPT_NTP_IP4] = 0;
+        }
 }
 
 /** Save integer options to file */
