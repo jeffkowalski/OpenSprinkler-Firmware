@@ -12,10 +12,10 @@ do
 done
 echo "Building OpenSprinkler..."
 
-#echo "Installing required libraries..."
-#apt-get install -y libmosquitto-dev
+echo "Installing required libraries..."
+apt-get install -y libmosquitto-dev
 echo "Compiling firmware..."
-g++ -o OpenSprinkler -DOSPI main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lpthread -lmosquitto
+g++ -o OpenSprinkler main.cpp OpenSprinkler.cpp program.cpp server.cpp utils.cpp weather.cpp gpio.cpp etherport.cpp mqtt.cpp -lmosquitto
 
 if [ ! "$SILENT" = true ] && [ -f OpenSprinkler.launch ] && [ ! -f /etc/init.d/OpenSprinkler.sh ]; then
 
