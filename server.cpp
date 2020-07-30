@@ -413,7 +413,8 @@ void server_manual_program() {
  * t:  station water time
  */
 void server_change_runonce() {
-    char * p = get_buffer;
+    char * my_buffer = strdup(get_buffer);  // local copy necessary because we may trigger web calls here
+    char * p = my_buffer;
 
     // decode url first
     if (p)
@@ -427,20 +428,20 @@ void server_change_runonce() {
             break;
         }
     }
-    if (!found)
+    if (!found) {
+        free (my_buffer);
         handle_return (HTML_DATA_MISSING);
+    }
     pv += 3;
 
     // reset all stations and prepare to run one-time program
-    reset_all_stations_immediate();
+    reset_all_stations_immediate();  // will clobber "get_buffer"
 
-    byte     sid, bid, s;
-    uint16_t dur;
-    boolean  match_found = false;
-    for (sid = 0; sid < os.nstations; sid++) {
-        dur = parse_listdata (&pv);
-        bid = sid >> 3;
-        s   = sid & 0x07;
+    boolean match_found = false;
+    for (byte sid = 0; sid < os.nstations; sid++) {
+        uint16_t dur = parse_listdata (&pv);
+        byte bid = sid >> 3;
+        byte s   = sid & 0x07;
         // if non-zero duration is given
         // and if the station has not been disabled
         if (dur > 0 && !(os.attrib_dis[bid] & (1 << s))) {
@@ -454,11 +455,14 @@ void server_change_runonce() {
             }
         }
     }
+
     if (match_found) {
         schedule_all_stations (os.now_tz());
+        free (my_buffer);
         handle_return (HTML_SUCCESS);
     }
 
+    free (my_buffer);
     handle_return (HTML_DATA_MISSING);
 }
 
