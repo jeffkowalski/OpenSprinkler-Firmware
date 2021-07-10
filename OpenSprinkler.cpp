@@ -769,7 +769,7 @@ void httpget_callback (byte status, uint16_t off, uint16_t len) {}
 void record_to_database (const char * postval) {
     EthernetClient      client;
     struct hostent *    host;
-    static const char * server = "carbon.local";
+    static const char * server = "cube.local";
 
     host = gethostbyname (server);
     if (!host) {
