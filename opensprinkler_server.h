@@ -18,24 +18,34 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see
- * <http://www.gnu.org/licenses/>. 
+ * <http://www.gnu.org/licenses/>.
  */
- 
-#ifndef _SERVER_H
-#define _SERVER_H
+
+#ifndef _OPENSPRINKLER_SERVER_H
+#define _OPENSPRINKLER_SERVER_H
 
 #if !defined(ARDUINO)
 #include <stdarg.h>
+#include <unistd.h>
 #endif
 
-char dec2hexchar(byte dec);
+char dec2hexchar(unsigned char dec);
 
 class BufferFiller {
 	char *start; //!< Pointer to start of buffer
 	char *ptr; //!< Pointer to cursor position
+	size_t len;
 public:
 	BufferFiller () {}
-	BufferFiller (char *buf) : start (buf), ptr (buf) {}
+	BufferFiller (char *buf, size_t buffer_len) {
+		start = buf;
+		ptr = buf;
+		len = buffer_len;
+	}
+
+	char* buffer () const { return start; }
+	size_t length () const { return len; }
+	unsigned int position () const { return ptr - start; }
 
 	void emit_p(PGM_P fmt, ...) {
 		va_list ap;
@@ -51,12 +61,12 @@ public:
 			c = pgm_read_byte(fmt++);
 			switch (c) {
 			case 'D':
-				//wtoa(va_arg(ap, uint16_t), (char*) ptr);
-				itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
+				// itoa(va_arg(ap, int), (char*) ptr, 10);  // ray
+				snprintf((char*) ptr, len - position(),  "%d", va_arg(ap, int));
 				break;
 			case 'L':
-				//ltoa(va_arg(ap, long), (char*) ptr, 10);
-				ultoa(va_arg(ap, long), (char*) ptr, 10); // ray
+				// ultoa(va_arg(ap, uint32_t), (char*) ptr, 10);
+				snprintf((char*) ptr, len - position(), "%lu", (unsigned long) va_arg(ap, uint32_t));
 				break;
 			case 'S':
 				strcpy((char*) ptr, va_arg(ap, const char*));
@@ -85,13 +95,10 @@ public:
 			}
 			ptr += strlen((char*) ptr);
 		}
-		*(ptr)=0;				 
+		*(ptr)=0;
 		va_end(ap);
 	}
-
-	char* buffer () const { return start; }
-	unsigned int position () const { return ptr - start; }
 };
 
 
-#endif // _SERVER_H
+#endif // _OPENSPRINKLER_SERVER_H
