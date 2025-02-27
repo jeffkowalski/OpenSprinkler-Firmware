@@ -1797,56 +1797,32 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
 }
 
 
-/** Callback function for browseUrl calls */
-void httpget_callback (unsigned char status, uint16_t off, uint16_t len) {
+/** Callback function for record_to-database (remote influxd) calls
+ * Log response to console */
+void httpget_callback (char *response) {
 #if defined(SERIAL_DEBUG)
-    Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
-    DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
+    DEBUG_PRINTLN(response);
 #endif
 }
 
 
 void record_to_database(const char *postval) {
-  EthernetClient client;
-  struct hostent *host;
-  static const char* server = "cube.local";
+    char server_with_port[32];
+	strcpy(server_with_port, "cube.local:8086");
 
-  host = gethostbyname(server);
-  if (!host) {
-    DEBUG_PRINT("can't resolve http server - ");
-    DEBUG_PRINTLN(server);
-    return;
-  }
+	int timeout_ms = 5000;
+	bool usessl = false;
 
-    if (!client.connect ((const char *)host->h_addr, 8086)) {
-    client.stop();
-    return;
-  }
+	char postBuffer[1500];
+	sprintf(postBuffer,
+			"POST /write?db=ospi HTTP/1.0\r\n"
+			"Accept: */*\r\n"
+			"Content-Length: %ld\r\n"
+			"Content-Type: application/json\r\n"
+			"\r\n%s",
+			strlen(postval), postval);
 
-  char postBuffer[1500];
-  sprintf(postBuffer, "POST /write?db=ospi HTTP/1.0\r\n"
-                      "Host: %s\r\n"
-                      "Accept: */*\r\n"
-                      "Content-Length: %ld\r\n"
-                      "Content-Type: application/json\r\n"
-                      "\r\n%s", host->h_name, strlen(postval), postval);
-  client.write((uint8_t *)postBuffer, strlen(postBuffer));
-
-  bzero(ether_buffer, ETHER_BUFFER_SIZE);
-
-  time_t timeout = now() + 5; // 5 seconds timeout
-  while(now() < timeout) {
-    int len=client.read((uint8_t *)ether_buffer, ETHER_BUFFER_SIZE);
-    if (len<=0) {
-      if(!client.connected())
-        break;
-      else
-        continue;
-    }
-    httpget_callback(0, 0, ETHER_BUFFER_SIZE);
-  }
-
-  client.stop();
+	OpenSprinkler::send_http_request(server_with_port, postBuffer, httpget_callback, usessl, timeout_ms);
 }
 
 
