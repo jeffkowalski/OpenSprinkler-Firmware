@@ -1798,7 +1798,7 @@ void OpenSprinkler::switch_special_station(unsigned char sid, unsigned char valu
 
 
 /** Callback function for browseUrl calls */
-void httpget_callback(byte status, uint16_t off, uint16_t len) {
+void httpget_callback (unsigned char status, uint16_t off, uint16_t len) {
 #if defined(SERIAL_DEBUG)
     Ethernet::buffer[off+ETHER_BUFFER_SIZE-1] = 0;
     DEBUG_PRINTLN((const char*) Ethernet::buffer + off);
@@ -1818,7 +1818,7 @@ void record_to_database(const char *postval) {
     return;
   }
 
-  if (!client.connect((uint8_t*)host->h_addr, 8086)) {
+    if (!client.connect ((const char *)host->h_addr, 8086)) {
     client.stop();
     return;
   }
@@ -1853,7 +1853,7 @@ void record_to_database(const char *postval) {
 /** Record valve status
  * Send a valve's on/off status to remote influx database
  */
-void record_valve_status(byte valve_num, bool status) {
+void record_valve_status (unsigned char valve_num, bool status) {
   static char postval[TMP_BUFFER_SIZE];
   sprintf(postval, "valve%02d value=%d", valve_num, status?1:0);
   record_to_database(postval);
@@ -1863,7 +1863,7 @@ void record_valve_status(byte valve_num, bool status) {
 /** Record current valve
  * Send the currently-on valve to emote influx database
  */
-void record_current_valve(byte valve_num) {
+void record_current_valve (unsigned char valve_num) {
     static char postval[TMP_BUFFER_SIZE];
     sprintf(postval, "valves value=%d", valve_num);
     record_to_database(postval);
