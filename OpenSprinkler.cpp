@@ -1808,7 +1808,7 @@ void httpget_callback (char *response) {
 
 void record_to_database(const char *postval) {
     char server_with_port[32];
-	strcpy(server_with_port, "cube.local:8086");
+	strcpy(server_with_port, "cube:8086");
 
 	int timeout_ms = 5000;
 	bool usessl = false;
